@@ -44,6 +44,16 @@ def search_info_apartment_house(driver, flag_write_headers):
                                      'Парковка': '-',
                                      'Способ продажи': '-'}
 
+        all_info_about_the_apartment = driver.find_elements(by='xpath', value='//li[@class="params-paramsList__item-appQw"]')
+        for point_info in all_info_about_the_apartment:
+            lst_point = point_info.text.split(':')
+            info_dict_apartment_house[lst_point[0].strip()] = lst_point[1].strip()
+
+        all_info_the_house = driver.find_elements(by='xpath', value='//li[@class="style-item-params-list-item-aXXql"]')
+        for point_info in all_info_the_house:
+            lst_point = point_info.text.split(':')
+            info_dict_apartment_house[lst_point[0].strip()] = lst_point[1].strip()
+
         driver.find_element(by='xpath', value='//button[@data-marker="item-phone-button/card"]').click()
         driver.implicitly_wait(15)
 
@@ -71,16 +81,6 @@ def search_info_apartment_house(driver, flag_write_headers):
 
         info_dict_apartment_house['Телефон'] = phone
         # Надо было это сделать, на страницах разные крестики могут быть, и адреса у них разные. Схожего элемента нет.
-
-        all_info_about_the_apartment = driver.find_elements(by='class name', value='params-paramsList__item-appQw')
-        for point_info in all_info_about_the_apartment:
-            lst_point = point_info.text.split(':')
-            info_dict_apartment_house[lst_point[0].strip()] = lst_point[1].strip()
-
-        all_info_the_house = driver.find_elements(by='class name', value='style-item-params-list-item-aXXql')
-        for point_info in all_info_the_house:
-            lst_point = point_info.text.split(':')
-            info_dict_apartment_house[lst_point[0].strip()] = lst_point[1].strip()
 
         with open('apartments.csv', 'a') as f_csv:
             writer = csv.DictWriter(f_csv, fieldnames=info_dict_apartment_house.keys())
