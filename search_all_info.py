@@ -1,40 +1,50 @@
-from easyocr import Reader
 import csv
-from time import sleep
+from time import sleep, time
 from bs4 import BeautifulSoup
 
-def _info(soup):
+
+def _info(soup, driver):
     try:
-        trader = soup.find('div', {'data-marker': 'seller-info/label'}).text
-        name_developer = soup.find('span', class_='text-size-ms-_Zk4a').text
-        price = soup.find('span', class_='text-size-xxl-UPhmI').text
-        address = soup.find('div', class_='style-item-address-KooqC').text.strip().replace('\n', ' ')
-        price_metr2 = soup.find('div', class_='style-item-price-sub-price-_5RUD').text
+        trader = soup.find('span', {'data-marker': 'seller-info/postfix'}).text
+        name_developer = soup.find('span', {'data-marker': 'seller-info/name'}).text
+        price = soup.find('span', {'data-marker': 'item-description/price'}).text
+        address = soup.find('span', {'data-marker': 'delivery/location'}).text.strip().replace('\n', ' ')
+        price_metr2 = soup.find('span', {'data-marker': 'item-description/normalized-price'}).text
         return trader, name_developer, price, address, price_metr2
     except:
-        print('Ошибка получения информации.')
-        return _info(soup)
+        driver.refresh()
+        soup = BeautifulSoup(driver.page_source, 'lxml')
+        print('Пробую по новой получить информацию.')
+        return _info(soup, driver)
 
-def _info_phone(soup, driver):
+
+def _info_phone(driver):
+    driver.find_element(by='class name', value='mav-182h73e').click()
+    sleep(1)
+    soup = BeautifulSoup(driver.page_source, 'lxml')
     try:
-        sleep(1)
-        link_phone = soup.find('img', class_='item-popup-phoneImage-adVhz').get('src')
-        driver.get(url=link_phone)
-        driver.save_screenshot(filename='/home/ivan/PycharmProjects/pythonProject/phone.png')
-        driver.back()
-        phone = ' '.join(Reader(['ru']).readtext('/home/ivan/PycharmProjects/pythonProject/phone.png', detail=0))
+        phone = soup.find('span', {'class': 'Y2vZ1'}).text.strip()
         return phone
     except:
-        print('Ошибка получения телефона.')
-        return _info_phone(soup, driver)
-def search_info_apartment_house(driver, flag_write_headers):
-    url_link = driver.current_url
+        try:
+            phone = ' '.join(soup.find('button', {'class': 'mav-ce0iew'}).text.split()[1:]).strip()
+            return phone
+        except:
+            driver.refresh()
+            print('Пробую по новой получить телефон.')
+            return _info_phone(driver)
+
+
+def search_info_apartment_house(driver, url_link):
+    start = time()
+
     soup = BeautifulSoup(driver.page_source, 'lxml')
-    trader, name_developer, price, address, price_metr2 = _info(soup)
+    trader, name_developer, price, address, price_metr2 = _info(soup, driver)
     info_dict_apartment_house = {'url': url_link,
-                                 'Застройщик': name_developer,
+                                 'Продавец': name_developer,
+                                 'Тип продавца': trader,
+                                 'Статус': '-',
                                  'Цена': price.replace('\xa0', ' '),
-                                 'Продавец': trader,
                                  'Цена за метр': price_metr2.replace('\xa0', ' '),
                                  'Адрес': address,
                                  'Телефон': '-',
@@ -62,27 +72,18 @@ def search_info_apartment_house(driver, flag_write_headers):
                                  'Парковка': '-',
                                  'Способ продажи': '-'}
 
-    all_info_about_the_apartment = soup.find_all('li', class_='params-paramsList__item-appQw')
+    all_info_about_the_apartment = soup.find_all('div', class_='yOvN2')
     for point_info in all_info_about_the_apartment:
         lst_point = point_info.text.split(':')
         info_dict_apartment_house[lst_point[0].strip()] = lst_point[1].strip().replace('\xa0', ' ')
 
-    all_info_the_house = soup.find_all('li', class_='style-item-params-list-item-aXXql')
+    all_info_the_house = soup.find_all('div', class_='Lehf0')
     for point_info in all_info_the_house:
         lst_point = point_info.text.split(':')
         info_dict_apartment_house[lst_point[0].strip()] = lst_point[1].strip().replace('\xa0', ' ')
 
-    driver.find_element(by='xpath', value='//button[@data-marker="item-phone-button/card"]').click()
-    sleep(1)
+    info_dict_apartment_house['Телефон'] = _info_phone(driver)
 
-    soup = BeautifulSoup(driver.page_source, 'lxml')
+    print(f'Обработал одну ссылку за {time() - start}.')
 
-    info_dict_apartment_house['Телефон'] = _info_phone(soup, driver)
-
-    with open('apartments.csv', 'a') as f_csv:
-        writer = csv.DictWriter(f_csv, fieldnames=info_dict_apartment_house.keys())
-
-        if flag_write_headers:
-            writer.writeheader()
-
-        writer.writerow(info_dict_apartment_house)
+    return info_dict_apartment_house
